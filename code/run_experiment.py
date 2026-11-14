@@ -15,13 +15,16 @@ from __future__ import annotations
 
 import argparse
 import csv
+import inspect
 import json
+import math
 import os
 import time
 
 import numpy as np
 import torch
 from datasets import Dataset
+import transformers
 from transformers import (AutoModelForSequenceClassification, AutoTokenizer,
                           DataCollatorWithPadding, Trainer, TrainingArguments,
                           set_seed)
@@ -67,12 +70,20 @@ def main():
     dev_rows = read_jsonl(a.dev)
 
     model = AutoModelForSequenceClassification.from_pretrained(a.model, num_labels=3)
-    args = TrainingArguments(
+    # Warmup is given as a step count computed from the ratio: `warmup_ratio` was removed in
+    # transformers v5, and arguments unknown to the installed version are dropped.
+    total_steps = math.ceil(len(train) / HP["batch"]) * HP["epochs"]
+    kwargs = dict(
         output_dir=os.path.join("/tmp", tag), seed=a.seed, data_seed=a.seed,
         num_train_epochs=HP["epochs"], learning_rate=HP["lr"],
-        per_device_train_batch_size=HP["batch"], warmup_ratio=HP["warmup_ratio"],
+        per_device_train_batch_size=HP["batch"], warmup_steps=int(HP["warmup_ratio"] * total_steps),
         weight_decay=HP["weight_decay"], fp16=torch.cuda.is_available(),
         save_strategy="no", logging_steps=200, report_to=[])
+    accepted = inspect.signature(TrainingArguments.__init__).parameters
+    dropped = [k for k in kwargs if k not in accepted]
+    if dropped:
+        print("TrainingArguments: ignoring unsupported arguments", dropped)
+    args = TrainingArguments(**{k: v for k, v in kwargs.items() if k in accepted})
     trainer = Trainer(model=model, args=args, train_dataset=train,
                       data_collator=DataCollatorWithPadding(tok))
     t0 = time.time()
@@ -102,6 +113,8 @@ def main():
         print(f"[{tag}] {name}: " + "  ".join(f"{c}={v.mean():.3f}" for c, v in correct.items()))
 
     json.dump({"model": a.model, "seed": a.seed, "hyperparameters": HP, "max_len": MAX_LEN,
+               "warmup_steps": kwargs["warmup_steps"], "total_steps": total_steps,
+               "transformers": transformers.__version__, "torch": torch.__version__,
                "train_minutes": round(train_min, 2), "clean_dev_acc": dev_acc,
                "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"},
               open(os.path.join(out, "train_log.json"), "w"), indent=2)
