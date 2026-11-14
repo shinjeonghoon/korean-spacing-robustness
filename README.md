@@ -32,6 +32,8 @@ SETS="data/setA_k1.jsonl data/setB_k1.jsonl data/setB_k2.jsonl"
 for m in klue/bert-base bert-base-multilingual-cased xlm-roberta-base; do
   for s in 0 1 2; do python code/run_experiment.py --model $m --seed $s --sets $SETS --outdir results; done
 done
+# replacement for the diverged XLM-R seed 0 (see Seeds)
+python code/run_experiment.py --model xlm-roberta-base --seed 3 --sets $SETS --outdir results
 for n in setA_k1 setB_k1 setB_k2; do
   python code/token_diff.py --input data/$n.jsonl --models klue/bert-base bert-base-multilingual-cased xlm-roberta-base --out results/tokdiff/$n.csv
 done
@@ -46,7 +48,13 @@ python code/analyze.py --results results --sets data --tokdiff results/tokdiff -
 | Segmentation change (H2) | `results/tables/table5_mediation.*` | + `token_diff.py` |
 
 ## Seeds
-- Fine-tuning: seeds 0, 1, 2 (`--seed`, also used as the data-order seed)
+- Fine-tuning: seeds 0, 1, 2 (`--seed`, also used as the data-order seed). A run whose clean dev
+  accuracy is at chance level (< 40%; it predicts one class for every input) has diverged; it is
+  excluded from all tables and replaced by the next seed (`hw2_colab.ipynb`, Cell 5). In the reported
+  runs this happened once: XLM-R seed 0 (33.3%), replaced by seed 3.
+- Even with a fixed seed, fp16 training on a GPU is not bit-for-bit deterministic: rerunning
+  KLUE-BERT seed 0 changed clean dev accuracy from 82.0% to 82.5%. Conclusions rest on the mean
+  over three seeds and on bootstrap CIs.
 - Perturbation sampling: seed 0 (`make_sets.sh`)
 - Bootstrap: seed 0, B = 2,000 (`analyze.py`)
 
