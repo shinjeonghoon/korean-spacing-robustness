@@ -91,7 +91,9 @@ def main():
     if a.preds:
         for name in a.models:
             tag = name.split("/")[-1]
-            fs = sorted(glob.glob(os.path.join(a.preds, f"{tag}_s*", "preds_setA_k1.csv")))
+            from analyze import run_dirs          # same divergence rule as the tables
+            fs = [os.path.join(d, "preds_setA_k1.csv") for d in run_dirs(a.preds)[0]
+                  if os.path.basename(d).rsplit("_s", 1)[0] == tag]
             if not fs:
                 continue
             p = sum(pd.read_csv(f).set_index("idx")[["CLEAN", "DEP"]] for f in fs) / len(fs)

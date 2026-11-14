@@ -30,6 +30,21 @@ import pandas as pd
 
 B = 2000
 RNG_SEED = 0
+# A fine-tuning run whose clean dev accuracy is at chance level (3 balanced classes = 33.3%)
+# has diverged (it predicts one class for every input). Such runs are excluded and reported;
+# the run with the next seed replaces it (see README).
+DIVERGED_BELOW = 0.40
+
+
+def run_dirs(results):
+    """All finished runs, split into (kept, diverged) by the clean dev accuracy rule."""
+    kept, bad = [], []
+    for d in sorted(glob.glob(os.path.join(results, "*_s*"))):
+        f = os.path.join(d, "train_log.json")
+        if not os.path.exists(f):
+            continue
+        (bad if json.load(open(f))["clean_dev_acc"] < DIVERGED_BELOW else kept).append(d)
+    return kept, bad
 MODEL_ORDER = ["bert-base", "bert-base-multilingual-cased", "xlm-roberta-base"]
 MODEL_NAME = {"bert-base": "KLUE-BERT", "bert-base-multilingual-cased": "mBERT", "xlm-roberta-base": "XLM-R"}
 
@@ -48,7 +63,7 @@ def fmt(m, lo, hi, pct=True):
 def load_preds(results, set_name):
     """-> {model: DataFrame indexed by idx, columns = conditions, values = mean correctness over seeds}"""
     out = {}
-    for d in sorted(glob.glob(os.path.join(results, "*_s*"))):
+    for d in run_dirs(results)[0]:
         f = os.path.join(d, f"preds_{set_name}.csv")
         if not os.path.exists(f):
             continue
@@ -72,13 +87,20 @@ def order(models):
 
 
 def table1(results, out):
-    rows = {}
-    for f in glob.glob(os.path.join(results, "*_s*", "train_log.json")):
-        j = json.load(open(f))
-        rows.setdefault(j["model"].split("/")[-1], []).append((j["clean_dev_acc"], j["train_minutes"]))
+    kept, bad = run_dirs(results)
+    rows, seeds, diverged = {}, {}, {}
+    for d in kept + bad:
+        j = json.load(open(os.path.join(d, "train_log.json")))
+        m = j["model"].split("/")[-1]
+        if d in bad:
+            diverged.setdefault(m, []).append(f"s{j['seed']} ({100*j['clean_dev_acc']:.1f}%)")
+            continue
+        rows.setdefault(m, []).append((j["clean_dev_acc"], j["train_minutes"]))
+        seeds.setdefault(m, []).append(j["seed"])
     df = pd.DataFrame({MODEL_NAME.get(m, m): {
         "Clean dev acc (%)": f"{100*np.mean([a for a, _ in v]):.1f} ± {100*np.std([a for a, _ in v]):.1f}",
-        "Seeds": len(v), "Train min / run": f"{np.mean([t for _, t in v]):.1f}"} for m, v in
+        "Seeds used": ",".join(map(str, sorted(seeds[m]))), "Diverged (excluded)": "; ".join(diverged.get(m, [])) or "–",
+        "Train min / run": f"{np.mean([t for _, t in v]):.1f}"} for m, v in
         ((m, rows[m]) for m in order(rows))}).T
     save(df, out, "table1_clean", "Clean KLUE-NLI dev accuracy (mean ± sd over seeds).")
 
@@ -158,7 +180,9 @@ def mediation(preds, tokdiff, rng):
 def examples(results, sets_dir, out, rng, n_per_type=5):
     rows = [json.loads(l) for l in open(os.path.join(sets_dir, "setA_k1.jsonl"), encoding="utf-8")]
     preds = {os.path.basename(d).rsplit("_s", 1)[0]: pd.read_csv(os.path.join(d, "preds_setA_k1.csv")).set_index("idx")
-             for d in sorted(glob.glob(os.path.join(results, "*_s0")))}
+             for d in [min((x for x in run_dirs(results)[0] if os.path.basename(x).rsplit("_s", 1)[0] == m),
+                           key=lambda x: int(x.rsplit("_s", 1)[1]))
+                       for m in {os.path.basename(x).rsplit("_s", 1)[0] for x in run_dirs(results)[0]}]}
     recs = []
     for t in ["JOSA", "DEP", "EOJEOL"]:
         for i in rng.choice(len(rows), n_per_type, replace=False):
