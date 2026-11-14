@@ -1,0 +1,9 @@
+kiwipiepy==0.24.0
+transformers>=4.40
+datasets>=2.18
+torch
+accelerate
+numpy
+pandas
+statsmodels
+tabulate
