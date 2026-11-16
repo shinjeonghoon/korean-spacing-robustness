@@ -201,6 +201,28 @@ def matched_change(preds, tokdiff, rng):
     return pd.DataFrame(rows).T
 
 
+def eojeol_nounnoun(preds, sets_dir, rng):
+    """EOJEOL edits that join two nouns (often an acceptable compound, e.g. 무기 체계 -> 무기체계)
+    versus all other EOJEOL edits, Set B (k=1). Uses Kiwi tags of the clean hypothesis."""
+    from kiwipiepy import Kiwi
+    kiwi = Kiwi()
+    rows = [json.loads(l) for l in open(os.path.join(sets_dir, "setB_k1.jsonl"), encoding="utf-8")]
+    nn = []
+    for r in rows:
+        pos = r["variants"]["EOJEOL"]["edits"][0]
+        toks = kiwi.tokenize(r["clean"])
+        L = [t for t in toks if t.start + t.len == pos]
+        R = [t for t in toks if t.start == pos + 1]
+        nn.append(bool(L and R and L[0].tag.startswith("NN") and R[0].tag.startswith("NN")))
+    nn = np.array(nn)
+    out = {}
+    for m in order(preds):
+        d = (preds[m]["CLEAN"] - preds[m]["EOJEOL"]).to_numpy()
+        out[MODEL_NAME.get(m, m)] = {f"noun+noun (n={nn.sum()})": fmt(*boot(d[nn], rng)),
+                                     f"other (n={(~nn).sum()})": fmt(*boot(d[~nn], rng))}
+    return pd.DataFrame(out).T
+
+
 def examples(results, sets_dir, out, rng, n_per_type=5):
     rows = [json.loads(l) for l in open(os.path.join(sets_dir, "setA_k1.jsonl"), encoding="utf-8")]
     preds = {os.path.basename(d).rsplit("_s", 1)[0]: pd.read_csv(os.path.join(d, "preds_setA_k1.csv")).set_index("idx")
@@ -255,6 +277,9 @@ def main():
              "Segmentation change and accuracy drop on Set B (k=1).")
         save(matched_change(pB1, pd.read_csv(td_path), rng), a.out, "table7_matched_change",
              "Drops of JOSA and EOJEOL within quartiles of segmentation change (Set B, k=1).")
+    pB1, _ = load_preds(a.results, "setB_k1")
+    save(eojeol_nounnoun(pB1, a.sets, np.random.default_rng(RNG_SEED + 2)), a.out, "table8_eojeol_nounnoun",
+         "EOJEOL drop for noun+noun joins vs. other joins (Set B, k=1).")
     # own generator, so the sampled examples do not depend on how many bootstrap draws ran before
     examples(a.results, a.sets, a.out, np.random.default_rng(RNG_SEED + 1))
 

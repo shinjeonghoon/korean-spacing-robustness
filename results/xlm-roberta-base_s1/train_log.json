@@ -1,0 +1,19 @@
+{
+  "model": "xlm-roberta-base",
+  "seed": 1,
+  "hyperparameters": {
+    "epochs": 3,
+    "lr": 3e-05,
+    "batch": 32,
+    "warmup_ratio": 0.1,
+    "weight_decay": 0.01
+  },
+  "max_len": 128,
+  "warmup_steps": 234,
+  "total_steps": 2346,
+  "transformers": "5.22.1",
+  "torch": "2.14.1+cu130",
+  "train_minutes": 6.51,
+  "clean_dev_acc": 0.782,
+  "gpu": "Tesla T4"
+}

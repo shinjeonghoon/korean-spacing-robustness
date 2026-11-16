@@ -1,0 +1,13 @@
+\begin{table}
+\caption{Segmentation change and accuracy drop on Set B (k=1).}
+\label{tab:table5_mediation}
+\begin{tabular}{llllll}
+\toprule
+ & JOSA: high − low & EOJEOL: high − low & RANDOM: high − low & controls & logit coef of edit\_norm (z) \\
+\midrule
+KLUE-BERT & -0.4 [-1.3, 0.4] & 5.0 [3.2, 6.8] & 4.6 [2.9, 6.4] & type, delta\_len & 0.41 [0.34, 0.48] \\
+mBERT & 0.4 [-0.5, 1.4] & 3.9 [2.3, 5.5] & 3.5 [2.1, 5.0] & type, delta\_len & 0.31 [0.25, 0.37] \\
+XLM-R & 0.0 [-0.9, 0.9] & 3.4 [2.0, 4.8] & 1.2 [0.0, 2.4] & type, delta\_len & 0.36 [0.28, 0.44] \\
+\bottomrule
+\end{tabular}
+\end{table}

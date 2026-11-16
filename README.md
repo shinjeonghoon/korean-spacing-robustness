@@ -38,7 +38,13 @@ for n in setA_k1 setB_k1 setB_k2; do
   python code/token_diff.py --input data/$n.jsonl --models klue/bert-base bert-base-multilingual-cased xlm-roberta-base --out results/tokdiff/$n.csv
 done
 python code/analyze.py --results results --sets data --tokdiff results/tokdiff --out results/tables
+python code/dep_tokens.py --set data/setA_k1.jsonl --models klue/bert-base bert-base-multilingual-cased xlm-roberta-base --preds results --out results/tables/table6_dep_tokens
+python code/figures.py --results results --tokdiff results/tokdiff --out results/figures
+python code/make_latex_tables.py --tables results/tables --out paper/tables
+python code/tokenization_example.py
 ```
+The per-example predictions of every reported run are included in `results/`, so all tables and figures
+can be regenerated on a CPU without retraining (skip the `run_experiment.py` loop).
 | Paper table | Output file | Produced by |
 |---|---|---|
 | Clean accuracy | `results/tables/table1_clean.*` | `run_experiment.py` → `analyze.py` |
@@ -46,6 +52,12 @@ python code/analyze.py --results results --sets data --tokdiff results/tokdiff -
 | Pairwise differences (H1) | `results/tables/table3_pairs_setA.*` | same |
 | Set B, k ablation | `results/tables/table4_setB.*` | same |
 | Segmentation change (H2) | `results/tables/table5_mediation.*` | + `token_diff.py` |
+| JOSA vs. EOJEOL at matched change (Fig. 2) | `results/tables/table7_matched_change.*`, `results/figures/fig2_matched_change.pdf` | `analyze.py`, `figures.py` |
+| Boundary-type drops (Fig. 1) | `results/figures/fig1_boundary_drop.pdf` | `figures.py` |
+| Dependent nouns | `results/tables/table6_dep_tokens.*` | `dep_tokens.py` |
+| EOJEOL noun+noun joins | `results/tables/table8_eojeol_nounnoun.*` | `analyze.py` |
+| Tokenization example | `results/tokenization_example.json` | `tokenization_example.py` |
+| Random examples, manual check | `results/tables/examples_random.csv`, `manual_check_100_completed.csv` (labels by the author) | `analyze.py` |
 
 ## Seeds
 - Fine-tuning: seeds 0, 1, 2 (`--seed`, also used as the data-order seed). A run whose clean dev
@@ -70,4 +82,7 @@ python code/analyze.py --results results --sets data --tokdiff results/tokdiff -
 | `code/run_experiment.py` | fine-tune on clean data and evaluate all conditions (no checkpoint saved) |
 | `code/analyze.py` | bootstrap statistics and all tables |
 | `code/prepare_data.py`, `code/make_sets.sh` | data conversion and evaluation sets |
+| `code/dep_tokens.py` | do dependent nouns survive as subwords after the DEP edit? |
+| `code/figures.py`, `code/make_latex_tables.py` | paper figures and LaTeX tables |
+| `code/tokenization_example.py` | the tokenization example table |
 | `hw2_colab.ipynb` | end-to-end Colab notebook |
