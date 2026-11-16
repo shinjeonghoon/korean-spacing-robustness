@@ -177,6 +177,30 @@ def mediation(preds, tokdiff, rng):
     return pd.DataFrame(rows).T
 
 
+def matched_change(preds, tokdiff, rng):
+    """Is the drop explained by how much the segmentation changes, or by which boundary is hit?
+    JOSA and EOJEOL edits are pooled, split into quartiles of edit_norm (per tokenizer), and the
+    drops of the two types are compared within each quartile, i.e. at a similar segmentation change."""
+    rows = {}
+    for m in order(preds):
+        td = tokdiff[tokdiff["model"].str.split("/").str[-1] == m]
+        df = preds[m]
+        parts = []
+        for t in ["JOSA", "EOJEOL"]:
+            g = td[td["type"] == t].set_index("idx")
+            parts.append(pd.DataFrame({"type": t, "e": g["edit_norm"], "drop": (df["CLEAN"] - df[t]).loc[g.index]}))
+        X = pd.concat(parts)
+        X["q"] = pd.qcut(X["e"].rank(method="first"), 4, labels=["Q1 (least)", "Q2", "Q3", "Q4 (most)"])
+        for q in X["q"].cat.categories:
+            r = {}
+            for t in ["JOSA", "EOJEOL"]:
+                x = X[(X["q"] == q) & (X["type"] == t)]["drop"].to_numpy()
+                r[f"{t} n"] = len(x)
+                r[f"{t} drop"] = fmt(*boot(x, rng))
+            rows[(MODEL_NAME.get(m, m), q)] = r
+    return pd.DataFrame(rows).T
+
+
 def examples(results, sets_dir, out, rng, n_per_type=5):
     rows = [json.loads(l) for l in open(os.path.join(sets_dir, "setA_k1.jsonl"), encoding="utf-8")]
     preds = {os.path.basename(d).rsplit("_s", 1)[0]: pd.read_csv(os.path.join(d, "preds_setA_k1.csv")).set_index("idx")
@@ -229,7 +253,10 @@ def main():
         pB1, _ = load_preds(a.results, "setB_k1")
         save(mediation(pB1, pd.read_csv(td_path), rng), a.out, "table5_mediation",
              "Segmentation change and accuracy drop on Set B (k=1).")
-    examples(a.results, a.sets, a.out, rng)
+        save(matched_change(pB1, pd.read_csv(td_path), rng), a.out, "table7_matched_change",
+             "Drops of JOSA and EOJEOL within quartiles of segmentation change (Set B, k=1).")
+    # own generator, so the sampled examples do not depend on how many bootstrap draws ran before
+    examples(a.results, a.sets, a.out, np.random.default_rng(RNG_SEED + 1))
 
 
 if __name__ == "__main__":
