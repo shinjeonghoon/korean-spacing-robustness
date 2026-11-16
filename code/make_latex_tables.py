@@ -129,7 +129,7 @@ lines = []
 for _, r in ex.iterrows():
     preds = " ".join(r[f"{m} clean/pert"] for m in order_m)
     lines.append(f"\\textsc{{{r['type'].title()}}} & {r['clean']} & {r['perturbed']} & {LAB[int(r['label'])]} & {preds} \\\\")
-write("examples", "\\begin{tabular}{l p{0.33\\textwidth} p{0.33\\textwidth} c c}\n\\toprule\n"
+write("examples", "\\begin{tabular}{l p{0.29\\textwidth} p{0.29\\textwidth} c c}\n\\toprule\n"
       "Type & Clean hypothesis & Perturbed hypothesis & Gold & " + "/".join(order_m) + " \\\\\n\\midrule\n"
       + "\n".join(lines) + "\n\\bottomrule\n\\end{tabular}\n")
 
